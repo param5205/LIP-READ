@@ -4,9 +4,9 @@
 This project aims to develop a deep learning based system that can read lips from video and convert it into text.
 
 ## Team Members
-- Member J - Data Collection & Preprocessing
-- Member P - Model Development & Backend
-- Frontend Developer - Frontend & Documentation
+- Member Jiya - Data Collection & Preprocessing
+- Member Param - Model Development & Backend
+- Member Kanishka5git - Frontend & Documentation
 
 ## Tech Stack
 - Frontend: HTML, CSS, JavaScript
