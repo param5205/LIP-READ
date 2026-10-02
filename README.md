@@ -28,10 +28,5 @@ LIP-READ/
 3. Run backend - python app.py
 4. Open frontend/index.html in browser
 
-## Work Division
-- J: Dataset handling and preprocessing
-- P: Model training and Flask backend
-- Frontend: Website UI and integration
-
 ## Current Status
 Project in development phase.
