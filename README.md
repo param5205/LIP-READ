@@ -6,7 +6,7 @@ This project aims to develop a deep learning based system that can read lips fro
 ## Team Members
 - Member Jiya - Data Collection & Preprocessing
 - Member Param - Model Development & Backend
-- Member Kanishka5git - Frontend & Documentation
+- Member Kanishka - Frontend & Documentation
 
 ## Tech Stack
 - Frontend: HTML, CSS, JavaScript
