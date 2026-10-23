@@ -2,8 +2,8 @@
 import argparse
 import json
 from pathlib import Path
-from dataset.preprocessing import preprocess_and_save
-from dataset.dataset_management import create_dataset_manifest, inventory_files
+from preprocessing import preprocess_and_save
+from dataset_management import create_dataset_manifest, inventory_files
 
 def main():
     parser = argparse.ArgumentParser(description="Lip Reading System - Module 1 tools")

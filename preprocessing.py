@@ -9,6 +9,11 @@ DEFAULT_SEQUENCE_LENGTH = 75
 
 def create_face_detector():
     """Load OpenCV's built-in frontal-face detector."""
+    if not hasattr(cv2, "CascadeClassifier"):
+        # OpenCV 5 removed CascadeClassifier. Fall back to the fixed mouth-region crop.
+        print("WARNING: this OpenCV has no CascadeClassifier (OpenCV 5?). "
+              "Using the fixed lower-face crop. Install opencv-python<5 for face detection.")
+        return None
     xml = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
     detector = cv2.CascadeClassifier(xml)
     if detector.empty():
@@ -23,7 +28,7 @@ def crop_approx_mouth(gray_frame, face_detector):
     results, replace this baseline with facial landmarks and inspect sample crops.
     """
     h, w = gray_frame.shape[:2]
-    faces = face_detector.detectMultiScale(
+    faces = () if face_detector is None else face_detector.detectMultiScale(
         gray_frame, scaleFactor=1.1, minNeighbors=4, minSize=(40, 40)
     )
     if len(faces):
