@@ -1,3 +1,6 @@
+// Address of the Flask backend (backend/app.py). Change it if the API runs elsewhere.
+const API_URL='http://127.0.0.1:5000/predict';
+
 let stream, recorder, chunks=[], lipData=[], faceMesh, camera;
 let isRecording=false, isUploadMode=false, uploadedFile=null;
 
@@ -24,13 +27,14 @@ function showFile(file){
   isUploadMode=true;
   lipData=[];
   const url=URL.createObjectURL(file);
-  if(file.type.startsWith('image')){
-    img.src=url; img.style.display='block'; vid.style.display='none';
+  if(!file.type.startsWith('video')){
+    out.innerText='Please upload a video file (mp4, webm, avi or mov).';
     document.getElementById('analyzeUploadBtn').style.display='none';
-    out.innerText='Image Uploaded - Video Upload Karo Lips Ke Liye';
+    uploadedFile=null; isUploadMode=false;
   } else {
+    vid.srcObject=null;
     vid.src=url; vid.style.display='block'; img.style.display='none';
-    vid.loop=false; vid.muted=true; vid.play();
+    vid.loop=false; vid.muted=true;
     document.getElementById('recStart').style.display='none';
     document.getElementById('recStop').style.display='none';
     document.getElementById('analyzeUploadBtn').style.display='inline-block';
@@ -38,6 +42,7 @@ function showFile(file){
     vid.onloadedmetadata=()=>{
       overlay.width=vid.videoWidth; overlay.height=vid.videoHeight;
       startLipTrackingForUpload();
+      vid.play().catch(()=>{});   // play only after the onplay handler exists
     };
   }
 }
@@ -59,7 +64,7 @@ async function startLive(){
 document.getElementById('liveBtn').onclick=startLive;
 
 function startLipTracking(){
-  faceMesh=new FaceMesh({locateFile:(file)=>`https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`});
+  faceMesh=new FaceMesh({locateFile:(file)=>`https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/${file}`});
   faceMesh.setOptions({maxNumFaces:1, refineLandmarks:true, minDetectionConfidence:0.5, minTrackingConfidence:0.5});
   faceMesh.onResults(onFaceResults);
   camera=new Camera(vid,{
@@ -70,7 +75,7 @@ function startLipTracking(){
 }
 
 function startLipTrackingForUpload(){
-  faceMesh=new FaceMesh({locateFile:(file)=>`https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`});
+  faceMesh=new FaceMesh({locateFile:(file)=>`https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/${file}`});
   faceMesh.setOptions({maxNumFaces:1, refineLandmarks:true, minDetectionConfidence:0.5, minTrackingConfidence:0.5});
   faceMesh.onResults(onFaceResults);
   // uploaded video ke har frame ko process karo
@@ -100,28 +105,21 @@ function onFaceResults(results){
     lipData.push(dist);
     if(isUploadMode){
       out.innerText=`🔍 Upload Video Lips Tracking... Frames: ${lipData.length} | Open: ${dist.toFixed(4)}`;
-    } else if(dist>0.025){
-      out.innerText=`👄 Muh Khula Hai - Distance: ${dist.toFixed(4)}`;
-      out.style.color='#ef4444';
+    } else if(!isRecording){
+      out.style.color='';
+      out.innerText=dist>0.025 ? '👄 Mouth open' : '👄 Face detected';
     }
   }
 }
 
 function startRec(){
-  if(!stream){ alert('Pehle Live Camera On Karo'); return; }
+  if(!stream){ alert('Turn on the live camera first.'); return; }
   chunks=[]; lipData=[]; isRecording=true;
   recorder=new MediaRecorder(stream);
   recorder.ondataavailable=e=>{ if(e.data.size>0) chunks.push(e.data); };
   recorder.onstop=()=>{
     const blob=new Blob(chunks,{type:'video/webm'});
-    const reader=new FileReader();
-    reader.onloadend=()=>{
-      localStorage.setItem('liply_video', reader.result);
-      localStorage.setItem('liply_text', analyzeLips());
-      localStorage.setItem('liply_duration', document.getElementById('timer').innerText);
-      window.location.href='result.html';
-    };
-    reader.readAsDataURL(blob);
+    finishWithPrediction(blob, 'clip.webm', document.getElementById('timer').innerText);
   };
   recorder.start();
   document.getElementById('recStart').style.display='none';
@@ -136,48 +134,49 @@ function stopRec(){
   recorder.stop();
   clearInterval(window.t);
   document.getElementById('recStop').style.display='none';
-  out.innerText='Processing Lips Data...';
+  out.innerText='Processing...';
 }
 
 function analyzeUploadedVideo(){
-  if(lipData.length===0){ alert('Lips detect nahi hue - dusri video try karo jisme face saaf dikhe'); return; }
-  const blob=uploadedFile;
-  const reader=new FileReader();
-  reader.onloadend=()=>{
-    localStorage.setItem('liply_video', reader.result);
-    localStorage.setItem('liply_text', analyzeLips() + '\n(Source: Uploaded Video)');
-    localStorage.setItem('liply_duration', Math.floor(vid.duration)+' sec');
-    window.location.href='result.html';
-  };
-  reader.readAsDataURL(blob);
+  if(!uploadedFile){ alert('Please upload a video first.'); return; }
+  finishWithPrediction(uploadedFile, uploadedFile.name, Math.floor(vid.duration||0)+' sec');
 }
 
-function analyzeLips(){
-  if(lipData.length===0) return "No lip movement detected - muh nahi hila";
-  let openEvents=0;
-  for(let i=1;i<lipData.length;i++){ 
-    if(lipData[i]>0.02 && lipData[i-1]<=0.02) openEvents++; 
+// Sends the clip to the Flask backend, saves the real answer, then opens the result page.
+async function finishWithPrediction(blob, filename, duration){
+  out.style.color='';
+  out.innerText='⏳ Reading lips... this can take a few seconds';
+  document.getElementById('analyzeUploadBtn').disabled=true;
+  let text;
+  try{
+    const form=new FormData();
+    form.append('video', blob, filename);
+    const res=await fetch(API_URL,{method:'POST',body:form});
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok) throw new Error(data.error || ('Server error '+res.status));
+    text=(data.prediction||'').trim() || '(no words recognised)';
+  }catch(e){
+    const msg = (e instanceof TypeError)
+      ? 'Cannot reach the backend. Start it with "python app.py" in the backend folder.'
+      : e.message;
+    out.style.color='#ef4444';
+    out.innerText='❌ '+msg;
+    document.getElementById('analyzeUploadBtn').disabled=false;
+    if(!isUploadMode) document.getElementById('recStart').style.display='inline-block';
+    return;
   }
-
-  // Demo ke liye openEvents se words banao
-  let predictedText = "";
-  if(openEvents <= 2)
-    {
-     predictedText = "Hi";
-    } else if(openEvents <= 5)
-   {
-     predictedText = "Hello, kaise ho?";
-   } else if(openEvents <= 8){
-     predictedText = "Namaste, main theek hoon";
-  } else if(openEvents <= 12){
-    predictedText = "Silence speaks louder";
-  } else if(openEvents <= 16){
-    predictedText = "Aapne jo bola woh maine samajh liya";
-  } else {
-    predictedText = "Hello friends, welcome to LIPLY";
-  }
-
-  return `Ye Aapne Bola Tha: "${predictedText}"\n\n[LIPS-ONLY ANALYSIS]\nFrames: ${lipData.length}\nMouth Open Events: ${openEvents}\nAvg Open: ${(lipData.reduce((a,b)=>a+b,0)/lipData.length).toFixed(4)}\n\nNote: Ye demo mapping hai - Real Lip Reading ke liye backend AI model lagega`;
+  try{
+    localStorage.setItem('liply_text', text);
+    localStorage.setItem('liply_duration', duration);
+    localStorage.removeItem('liply_video');
+    // keep the video only if it fits in browser storage; the result page works without it
+    const reader=new FileReader();
+    reader.onloadend=()=>{
+      try{ localStorage.setItem('liply_video', reader.result); }catch(e){}
+      window.location.href='result.html';
+    };
+    reader.readAsDataURL(blob);
+  }catch(e){ window.location.href='result.html'; }
 }
 
 document.getElementById('recStart').onclick=startRec;
@@ -192,4 +191,6 @@ function goHome(){
   document.getElementById('app').style.display='none';
   vid.pause(); vid.srcObject=null;
   document.getElementById('analyzeUploadBtn').style.display='none';
+  document.getElementById('analyzeUploadBtn').disabled=false;
+  out.style.color='';
 }
