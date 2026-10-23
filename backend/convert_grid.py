@@ -2,6 +2,7 @@
 Convert the GRID corpus into the format the backend expects.
 
   GRID:   <videos>/s1/bbaf2n.mpg      <aligns>/s1/bbaf2n.align
+  Kaggle: data/s1_processed/bbaf2n.mpg   data/s1_processed/align/bbaf2n.align   (also supported)
   Output: <out>/videos/s1_bbaf2n.mp4  <out>/labels/s1_bbaf2n.txt   (lowercase sentence)
 
 Usage (run from the backend folder or anywhere):
@@ -70,13 +71,21 @@ def main():
         if not p.is_dir():
             sys.exit(f"Folder not found: {p}")
 
-    # index alignments by (speaker folder, clip name) because clip names repeat across speakers
-    aligns = {(p.parent.name, p.stem): p for p in aroot.rglob("*.align")}
-    print(f"Found {len(aligns)} .align files")
+    # Clip names repeat across speakers, so index alignments by (speaker folder, clip name).
+    # The speaker folder is the .align file's parent, or its grandparent when the labels
+    # sit in a sub-folder such as "align" (Kaggle layout: s1_processed/align/xxx.align).
+    def speaker_of(p):
+        return p.name.replace("_processed", "")
+
+    aligns = {}
+    for p in aroot.rglob("*.align"):
+        aligns[(speaker_of(p.parent), p.stem)] = p
+        aligns.setdefault((speaker_of(p.parent.parent), p.stem), p)
+    print(f"Found {len(set(aligns.values()))} .align files")
 
     vids = sorted(vroot.rglob("*.mpg"))
     if a.speakers:
-        vids = [v for v in vids if v.parent.name in set(a.speakers)]
+        vids = [v for v in vids if speaker_of(v.parent) in set(a.speakers)]
     print(f"Found {len(vids)} .mpg videos")
     if not vids:
         sys.exit("No videos found. Check the --videos path.")
@@ -89,12 +98,12 @@ def main():
     for v in vids:
         if a.limit and done >= a.limit:
             break
-        name = f"{v.parent.name}_{v.stem}"
+        name = f"{speaker_of(v.parent)}_{v.stem}"
         mp4, txt = vout / f"{name}.mp4", lout / f"{name}.txt"
         if mp4.exists() and txt.exists():
             skipped += 1
             continue
-        al = aligns.get((v.parent.name, v.stem))
+        al = aligns.get((speaker_of(v.parent), v.stem))
         if al is None:
             missing += 1
             continue
