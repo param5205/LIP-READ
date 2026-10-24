@@ -1,8 +1,23 @@
-let text='No data', videoData=null;
-try{ text=localStorage.getItem('liply_text')||'No data'; videoData=localStorage.getItem('liply_video'); }catch(e){}
+let text='No data';
+try{ text=localStorage.getItem('liply_text')||'No data'; }catch(e){}
 
 document.getElementById('textBox').innerText = text;
-if(videoData) document.getElementById('resultVideo').src=videoData;
+
+// load the clip that index.html saved in IndexedDB (if any) and show it in the player
+(function loadVideo(){
+  try{
+    const req=indexedDB.open('liply',1);
+    req.onupgradeneeded=()=>req.result.createObjectStore('videos');
+    req.onsuccess=()=>{
+      const db=req.result;
+      const get=db.transaction('videos','readonly').objectStore('videos').get('last');
+      get.onsuccess=()=>{
+        if(get.result) document.getElementById('resultVideo').src=URL.createObjectURL(get.result);
+        db.close();
+      };
+    };
+  }catch(e){}
+})();
 
 document.getElementById('startTranslateBtn').onclick=async()=>{
   const btn=document.getElementById('startTranslateBtn');

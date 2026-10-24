@@ -168,15 +168,29 @@ async function finishWithPrediction(blob, filename, duration){
   try{
     localStorage.setItem('liply_text', text);
     localStorage.setItem('liply_duration', duration);
-    localStorage.removeItem('liply_video');
-    // keep the video only if it fits in browser storage; the result page works without it
-    const reader=new FileReader();
-    reader.onloadend=()=>{
-      try{ localStorage.setItem('liply_video', reader.result); }catch(e){}
-      window.location.href='result.html';
-    };
-    reader.readAsDataURL(blob);
-  }catch(e){ window.location.href='result.html'; }
+  }catch(e){}
+  // The video goes into IndexedDB (room for large files); the result page works even if this fails.
+  try{ await saveVideo(blob); }catch(e){}
+  window.location.href='result.html';
+}
+
+// ---- tiny IndexedDB helper: keeps the last clip so result.html can replay it ----
+function openVideoDB(){
+  return new Promise((resolve,reject)=>{
+    const req=indexedDB.open('liply',1);
+    req.onupgradeneeded=()=>req.result.createObjectStore('videos');
+    req.onsuccess=()=>resolve(req.result);
+    req.onerror=()=>reject(req.error);
+  });
+}
+async function saveVideo(blob){
+  const db=await openVideoDB();
+  await new Promise((resolve,reject)=>{
+    const tx=db.transaction('videos','readwrite');
+    tx.objectStore('videos').put(blob,'last');
+    tx.oncomplete=resolve; tx.onerror=()=>reject(tx.error);
+  });
+  db.close();
 }
 
 document.getElementById('recStart').onclick=startRec;
