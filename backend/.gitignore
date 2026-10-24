@@ -1,0 +1,30 @@
+# Virtual environment
+venv/
+.venv/
+env/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Dataset and cached tensors (too big for GitHub; share via Kaggle/Drive)
+data/
+
+# Trained model weights (share via Drive/Colab)
+*.pt
+*.pth
+
+# Video files (keeps stray test clips out of the repo)
+*.mp4
+*.webm
+*.avi
+*.mov
+
+# Secrets and editor/OS files
+.env
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Face model, downloaded automatically on first run
+*.task
