@@ -63,3 +63,27 @@ body{font-family:sans-serif;background:#f8fbff;color:#0f172a;overflow-x:hidden}
 #timer{color:#ef4444;font-weight:bold;margin-top:8px}
 #dl{display:none;margin-top:8px;color:#2563eb;font-weight:700;text-decoration:none}
 @media(max-width:700px){.main-img{width:200px;max-height:32vh}#previewVideo{width:92%;height:42vh}}
+
+/* Fix: Uploaded video preview - black screen issue */
+#previewVideo {
+  width: 100%;
+  height: 100%;
+  max-width: 640px;
+  max-height: 480px;
+  object-fit: contain; /* cover ki jagah contain - poori video dikhegi */
+  background: #111; /* black ki jagah dark gray */
+  border-radius: 12px;
+  display: block;
+}
+
+#app {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+#overlay {
+  pointer-events: none; /* canvas click ko block na kare */
+  border-radius: 12px;
+}
