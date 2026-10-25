@@ -8,7 +8,7 @@ const vid = document.getElementById('previewVideo');
 const img = document.getElementById('imgPreview');
 const out = document.getElementById('output');
 const overlay = document.getElementById('overlay');
-const ctx = overlay.getContext('2d');
+const ctx = overlay ? overlay.getContext('2d') : null;
 
 setTimeout(() => {
   const loading = document.getElementById('loading');
@@ -17,53 +17,66 @@ setTimeout(() => {
   if (landing) landing.style.display = 'flex';
 }, 1000);
 
-document.getElementById('uploadBtn').onclick = () => document.getElementById('fileInput').click();
-document.getElementById('backBtn').onclick = () => goHome();
-document.getElementById('fileInput').onchange = e => { if (e.target.files[0]) showFile(e.target.files[0]); };
-document.getElementById('dropZone').onclick = () => document.getElementById('fileInput').click();
+const uploadBtn = document.getElementById('uploadBtn');
+if (uploadBtn) uploadBtn.onclick = () => document.getElementById('fileInput').click();
+const backBtn = document.getElementById('backBtn');
+if (backBtn) backBtn.onclick = () => goHome();
+const fileInput = document.getElementById('fileInput');
+if (fileInput) fileInput.onchange = e => { if (e.target.files[0]) showFile(e.target.files[0]); };
+const dropZone = document.getElementById('dropZone');
+if (dropZone) dropZone.onclick = () => document.getElementById('fileInput').click();
 
 function showFile(file) {
-  document.getElementById('landing').style.display = 'none';
-  document.getElementById('app').style.display = 'flex';
+  const landing = document.getElementById('landing');
+  const app = document.getElementById('app');
+  if (landing) landing.style.display = 'none';
+  if (app) app.style.display = 'flex';
   uploadedFile = file;
   isUploadMode = true;
   lipData = [];
   const url = URL.createObjectURL(file);
   
   if (!file.type.startsWith('video')) {
-    out.innerText = 'Please upload a valid video file (mp4, webm, avi or mov).';
-    document.getElementById('analyzeUploadBtn').style.display = 'none';
+    if (out) out.innerText = 'Please upload a valid video file (mp4, webm, avi or mov).';
+    const btn = document.getElementById('analyzeUploadBtn');
+    if (btn) btn.style.display = 'none';
     uploadedFile = null; 
     isUploadMode = false;
     return;
   }
   
-  // FIX: Black screen - clear old stream and set new src properly
+  // Fix black screen: clear old stream
   if (vid.srcObject) {
-    vid.srcObject.getTracks().forEach(t => t.stop());
+    try { vid.srcObject.getTracks().forEach(t => t.stop()); } catch(e) {}
     vid.srcObject = null;
   }
-  if (vid.src) URL.revokeObjectURL(vid.src);
+  if (vid.src && vid.src.startsWith('blob:')) {
+    try { URL.revokeObjectURL(vid.src); } catch(e) {}
+  }
   
   vid.src = url; 
   vid.style.display = 'block'; 
   if (img) img.style.display = 'none';
   vid.loop = false; 
   vid.muted = true;
-  vid.controls = true; // controls dikhao taaki user dekh sake
+  vid.controls = true;
   vid.playsInline = true;
   
-  document.getElementById('recStart').style.display = 'none';
-  document.getElementById('recStop').style.display = 'none';
-  document.getElementById('analyzeUploadBtn').style.display = 'inline-block';
-  out.innerText = 'Video uploaded successfully - Click Analyze to read lips';
+  const recStart = document.getElementById('recStart');
+  const recStop = document.getElementById('recStop');
+  const analyzeBtn = document.getElementById('analyzeUploadBtn');
+  if (recStart) recStart.style.display = 'none';
+  if (recStop) recStop.style.display = 'none';
+  if (analyzeBtn) analyzeBtn.style.display = 'inline-block';
+  if (out) out.innerText = 'Video uploaded successfully - Click Analyze to read lips';
   
   vid.onloadedmetadata = () => {
-    overlay.width = vid.videoWidth; 
-    overlay.height = vid.videoHeight;
-    // overlay ko video ke size pe fit karo
-    overlay.style.width = '100%';
-    overlay.style.height = '100%';
+    if (overlay) {
+      overlay.width = vid.videoWidth; 
+      overlay.height = vid.videoHeight;
+      overlay.style.width = '100%';
+      overlay.style.height = '100%';
+    }
     startLipTrackingForUpload();
   };
   
@@ -73,8 +86,10 @@ function showFile(file) {
 }
 
 async function startLive() {
-  document.getElementById('landing').style.display = 'none';
-  document.getElementById('app').style.display = 'flex';
+  const landing = document.getElementById('landing');
+  const app = document.getElementById('app');
+  if (landing) landing.style.display = 'none';
+  if (app) app.style.display = 'flex';
   isUploadMode = false; lipData = [];
   try {
     stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
@@ -83,15 +98,18 @@ async function startLive() {
     if (img) img.style.display = 'none';
     vid.controls = false;
     await vid.play();
-    document.getElementById('recStart').style.display = 'inline-block';
-    document.getElementById('analyzeUploadBtn').style.display = 'none';
-    out.innerText = 'Lips are being detected - Please move your mouth';
+    const recStart = document.getElementById('recStart');
+    const analyzeBtn = document.getElementById('analyzeUploadBtn');
+    if (recStart) recStart.style.display = 'inline-block';
+    if (analyzeBtn) analyzeBtn.style.display = 'none';
+    if (out) out.innerText = 'Lips are being detected - Please move your mouth';
     startLipTracking();
   } catch (e) { 
-    out.innerText = 'Error: ' + e.message; 
+    if (out) out.innerText = 'Error: ' + e.message; 
   }
 }
-document.getElementById('liveBtn').onclick = startLive;
+const liveBtn = document.getElementById('liveBtn');
+if (liveBtn) liveBtn.onclick = startLive;
 
 function startLipTracking() {
   faceMesh = new FaceMesh({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/${file}` });
@@ -118,7 +136,9 @@ function startLipTrackingForUpload() {
 }
 
 function onFaceResults(results) {
+  if (!overlay) return;
   if (!overlay.width) { overlay.width = vid.videoWidth; overlay.height = vid.videoHeight; }
+  if (!ctx) return;
   ctx.clearRect(0, 0, overlay.width, overlay.height);
   if (results.multiFaceLandmarks && results.multiFaceLandmarks[0]) {
     const landmarks = results.multiFaceLandmarks[0];
@@ -134,10 +154,12 @@ function onFaceResults(results) {
     const dist = Math.abs(upper.y - lower.y);
     lipData.push(dist);
     if (isUploadMode) {
-      out.innerText = `Tracking lip movements - Frames: ${lipData.length} | Mouth Open: ${dist.toFixed(4)}`;
+      if (out) out.innerText = `Tracking lip movements - Frames: ${lipData.length} | Mouth Open: ${dist.toFixed(4)}`;
     } else if (!isRecording) {
-      out.style.color = '';
-      out.innerText = dist > 0.025 ? 'Mouth is open' : 'Face detected successfully';
+      if (out) {
+        out.style.color = '';
+        out.innerText = dist > 0.025 ? 'Mouth is open' : 'Face detected successfully';
+      }
     }
   }
 }
@@ -149,22 +171,28 @@ function startRec() {
   recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
   recorder.onstop = () => {
     const blob = new Blob(chunks, { type: 'video/webm' });
-    finishWithPrediction(blob, 'clip.webm', document.getElementById('timer').innerText);
+    const timer = document.getElementById('timer');
+    finishWithPrediction(blob, 'clip.webm', timer ? timer.innerText : '0 sec');
   };
   recorder.start();
-  document.getElementById('recStart').style.display = 'none';
-  document.getElementById('recStop').style.display = 'inline-block';
-  out.innerText = 'Recording lip movements - Audio is not required';
-  let s = 0; window.t = setInterval(() => { s++; document.getElementById('timer').innerText = s + ' sec'; }, 1000);
+  const recStart = document.getElementById('recStart');
+  const recStop = document.getElementById('recStop');
+  if (recStart) recStart.style.display = 'none';
+  if (recStop) recStop.style.display = 'inline-block';
+  if (out) out.innerText = 'Recording lip movements - Audio is not required';
+  let s = 0; 
+  const timerEl = document.getElementById('timer');
+  window.t = setInterval(() => { s++; if (timerEl) timerEl.innerText = s + ' sec'; }, 1000);
 }
 
 function stopRec() {
   if (!isRecording) return;
   isRecording = false;
-  recorder.stop();
+  try { recorder.stop(); } catch(e) {}
   clearInterval(window.t);
-  document.getElementById('recStop').style.display = 'none';
-  out.innerText = 'Processing video, please wait...';
+  const recStop = document.getElementById('recStop');
+  if (recStop) recStop.style.display = 'none';
+  if (out) out.innerText = 'Processing video, please wait...';
 }
 
 function analyzeUploadedVideo() {
@@ -173,9 +201,12 @@ function analyzeUploadedVideo() {
 }
 
 async function finishWithPrediction(blob, filename, duration) {
-  out.style.color = '';
-  out.innerText = 'Reading lip movements - This may take a few seconds';
-  document.getElementById('analyzeUploadBtn').disabled = true;
+  if (out) {
+    out.style.color = '';
+    out.innerText = 'Reading lip movements - This may take a few seconds';
+  }
+  const analyzeBtn = document.getElementById('analyzeUploadBtn');
+  if (analyzeBtn) analyzeBtn.disabled = true;
   let text;
   try {
     const form = new FormData();
@@ -188,10 +219,13 @@ async function finishWithPrediction(blob, filename, duration) {
     const msg = (e instanceof TypeError)
       ? 'Cannot reach the backend server. Please start it with "python app.py" in the backend folder.'
       : e.message;
-    out.style.color = '#ef4444';
-    out.innerText = 'Error: ' + msg;
-    document.getElementById('analyzeUploadBtn').disabled = false;
-    if (!isUploadMode) document.getElementById('recStart').style.display = 'inline-block';
+    if (out) {
+      out.style.color = '#ef4444';
+      out.innerText = 'Error: ' + msg;
+    }
+    if (analyzeBtn) analyzeBtn.disabled = false;
+    const recStart = document.getElementById('recStart');
+    if (!isUploadMode && recStart) recStart.style.display = 'inline-block';
     return;
   }
   try {
@@ -220,21 +254,34 @@ async function saveVideo(blob) {
   db.close();
 }
 
-document.getElementById('recStart').onclick = startRec;
-document.getElementById('recStop').onclick = stopRec;
-document.getElementById('analyzeUploadBtn').onclick = analyzeUploadedVideo;
+const recStartBtn = document.getElementById('recStart');
+if (recStartBtn) recStartBtn.onclick = startRec;
+const recStopBtn = document.getElementById('recStop');
+if (recStopBtn) recStopBtn.onclick = stopRec;
+const analyzeUploadBtn = document.getElementById('analyzeUploadBtn');
+if (analyzeUploadBtn) analyzeUploadBtn.onclick = analyzeUploadedVideo;
 
 function goHome() {
-  if (stream) stream.getTracks().forEach(t => t.stop());
-  if (camera) camera.stop();
+  if (stream) { try { stream.getTracks().forEach(t => t.stop()); } catch(e) {} }
+  if (camera) { try { camera.stop(); } catch(e) {} }
   isUploadMode = false;
-  document.getElementById('landing').style.display = 'flex';
-  document.getElementById('app').style.display = 'none';
-  vid.pause(); vid.srcObject = null;
-  if (vid.src) URL.revokeObjectURL(vid.src);
+  const landing = document.getElementById('landing');
+  const app = document.getElementById('app');
+  if (landing) landing.style.display = 'flex';
+  if (app) app.style.display = 'none';
+  try { vid.pause(); } catch(e) {}
+  vid.srcObject = null;
+  if (vid.src && vid.src.startsWith('blob:')) {
+    try { URL.revokeObjectURL(vid.src); } catch(e) {}
+  }
   vid.src = '';
-  document.getElementById('analyzeUploadBtn').style.display = 'none';
-  document.getElementById('analyzeUploadBtn').disabled = false;
-  out.style.color = '';
-  out.innerText = '';
+  const analyzeBtn = document.getElementById('analyzeUploadBtn');
+  if (analyzeBtn) {
+    analyzeBtn.style.display = 'none';
+    analyzeBtn.disabled = false;
+  }
+  if (out) {
+    out.style.color = '';
+    out.innerText = '';
+  }
 }
