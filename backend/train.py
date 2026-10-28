@@ -35,20 +35,32 @@ class LipDataset(Dataset):
         return len(self.videos)
 
     def __getitem__(self, i):
-        video = self.videos[i]
-        name = os.path.splitext(os.path.basename(video))[0]
+        # Some clips have no detectable face. Skip them (and remember them) instead of crashing.
+        n = len(self.videos)
+        for step in range(n):
+            video = self.videos[(i + step) % n]
+            name = os.path.splitext(os.path.basename(video))[0]
+            bad = os.path.join(CACHE_DIR, name + ".bad")
+            if os.path.exists(bad):
+                continue
 
-        # Cache preprocessed tensors: mouth cropping is slow, so do it only once
-        cache = os.path.join(CACHE_DIR, name + ".pt")
-        if os.path.exists(cache):
-            x = torch.load(cache)
-        else:
-            x = preprocess_video(video).squeeze(0)       # (C, T, H, W)
-            torch.save(x, cache)
+            # Cache preprocessed tensors: mouth cropping is slow, so do it only once
+            cache = os.path.join(CACHE_DIR, name + ".pt")
+            try:
+                if os.path.exists(cache):
+                    x = torch.load(cache)
+                else:
+                    x = preprocess_video(video).squeeze(0)       # (C, T, H, W)
+                    torch.save(x, cache)
+            except ValueError:
+                print(f"  skipping {name}: no face/mouth detected", flush=True)
+                open(bad, "w").close()
+                continue
 
-        with open(os.path.join(LABEL_DIR, name + ".txt"), encoding="utf-8") as f:
-            label = f.read().strip()
-        return x, torch.tensor(encode(label), dtype=torch.long)
+            with open(os.path.join(LABEL_DIR, name + ".txt"), encoding="utf-8") as f:
+                label = f.read().strip()
+            return x, torch.tensor(encode(label), dtype=torch.long)
+        raise RuntimeError("No usable clips found in " + VIDEO_DIR)
 
 
 def collate(batch):
