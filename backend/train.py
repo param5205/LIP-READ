@@ -18,12 +18,22 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset, random_split
 
 from model import LipReader
-from preprocess import DEVICE, IN_CHANNELS, VOCAB, encode, preprocess_video
+from preprocess import DEVICE, IN_CHANNELS, MEAN, STD, VOCAB, encode, preprocess_video
 
 VIDEO_DIR, LABEL_DIR, CACHE_DIR = "data/videos", "data/labels", "data/cache"
 MODEL_PATH = "lipreader.pt"
 EPOCHS, BATCH_SIZE, LR = 30, 8, 3e-4
 SEED = 42
+
+
+def to_uint8(x):
+    """Normalised float tensor -> uint8 (the original pixel values). Cache files become 4x smaller."""
+    return ((x * STD + MEAN) * 255.0).round().clamp(0, 255).to(torch.uint8)
+
+
+def from_uint8(u):
+    """uint8 cache tensor -> the normalised float tensor the model expects."""
+    return (u.float() / 255.0 - MEAN) / STD
 
 
 class LipDataset(Dataset):
@@ -45,13 +55,13 @@ class LipDataset(Dataset):
                 continue
 
             # Cache preprocessed tensors: mouth cropping is slow, so do it only once
-            cache = os.path.join(CACHE_DIR, name + ".pt")
+            cache = os.path.join(CACHE_DIR, name + ".u8.pt")
             try:
                 if os.path.exists(cache):
-                    x = torch.load(cache)
+                    x = from_uint8(torch.load(cache))
                 else:
                     x = preprocess_video(video).squeeze(0)       # (C, T, H, W)
-                    torch.save(x, cache)
+                    torch.save(to_uint8(x), cache)
             except ValueError:
                 print(f"  skipping {name}: no face/mouth detected", flush=True)
                 open(bad, "w").close()
@@ -101,13 +111,15 @@ def main():
     ap = argparse.ArgumentParser(description="Train the lip reading model")
     ap.add_argument("--init", help="start from these saved weights instead of from scratch")
     ap.add_argument("--epochs", type=int, default=EPOCHS, help=f"number of epochs (default {EPOCHS})")
+    ap.add_argument("--workers", type=int, default=0,
+                    help="parallel data-loading processes (speeds up the slow first epoch; 0 = off)")
     ap.add_argument("--max-hours", type=float, default=0,
                     help="stop cleanly after the epoch that passes this many hours (0 = no limit)")
     args = ap.parse_args()
 
     train_ds, val_ds, _ = get_splits()
-    train_dl = DataLoader(train_ds, BATCH_SIZE, shuffle=True, collate_fn=collate)
-    val_dl = DataLoader(val_ds, BATCH_SIZE, collate_fn=collate)
+    train_dl = DataLoader(train_ds, BATCH_SIZE, shuffle=True, collate_fn=collate, num_workers=args.workers)
+    val_dl = DataLoader(val_ds, BATCH_SIZE, collate_fn=collate, num_workers=args.workers)
 
     model = LipReader(len(VOCAB) + 1, IN_CHANNELS).to(DEVICE)
     if args.init:
