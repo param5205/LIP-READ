@@ -15,7 +15,7 @@ import time
 
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader, Dataset, random_split
+from torch.utils.data import Subset, DataLoader, Dataset, random_split
 
 from model import LipReader
 from preprocess import DEVICE, IN_CHANNELS, MEAN, STD, VOCAB, encode, preprocess_video
@@ -79,10 +79,26 @@ def collate(batch):
     return torch.stack(xs), torch.cat(ys), lengths
 
 
-def get_splits():
-    """80/10/10 split with a fixed seed so test.py sees the same test set."""
+def get_splits(own_holdout=0.0):
+    """80/10/10 split with a fixed seed so test.py sees the same test set.
+
+    own_holdout > 0 (e.g. 0.2): that fraction of YOUR clips (files named me_*.mp4, made by
+    record_clips.py) is kept out as the test set; everything else is split 90/10 train/val.
+    Use the same value in train.py and test.py."""
     ds = LipDataset()
     n = len(ds)
+    if own_holdout > 0:
+        own = [i for i, v in enumerate(ds.videos) if os.path.basename(v).startswith("me_")]
+        if not own:
+            raise SystemExit("--own-holdout needs clips named me_*.mp4 in " + VIDEO_DIR)
+        n_hold = max(1, int(own_holdout * len(own)))
+        test_idx = own[-n_hold:]                      # last clips of yours, fixed and repeatable
+        held = set(test_idx)
+        rest = [i for i in range(n) if i not in held]
+        gen = torch.Generator().manual_seed(SEED)
+        perm = [rest[k] for k in torch.randperm(len(rest), generator=gen).tolist()]
+        n_val = int(0.1 * len(perm))
+        return Subset(ds, perm[n_val:]), Subset(ds, perm[:n_val]), Subset(ds, test_idx)
     n_val, n_test = int(0.1 * n), int(0.1 * n)
     gen = torch.Generator().manual_seed(SEED)
     return random_split(ds, [n - n_val - n_test, n_val, n_test], generator=gen)
@@ -115,9 +131,11 @@ def main():
                     help="parallel data-loading processes (speeds up the slow first epoch; 0 = off)")
     ap.add_argument("--max-hours", type=float, default=0,
                     help="stop cleanly after the epoch that passes this many hours (0 = no limit)")
+    ap.add_argument("--own-holdout", type=float, default=0.0,
+                    help="keep this fraction of your me_* clips as the test set (e.g. 0.2)")
     args = ap.parse_args()
 
-    train_ds, val_ds, _ = get_splits()
+    train_ds, val_ds, _ = get_splits(args.own_holdout)
     train_dl = DataLoader(train_ds, BATCH_SIZE, shuffle=True, collate_fn=collate, num_workers=args.workers)
     val_dl = DataLoader(val_ds, BATCH_SIZE, collate_fn=collate, num_workers=args.workers)
 
