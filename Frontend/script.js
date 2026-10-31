@@ -1,287 +1,325 @@
 // Address of the Flask backend (backend/app.py). Change it if the API runs elsewhere.
-const API_URL = 'http://127.0.0.1:5000/predict';
+const API_URL='http://127.0.0.1:5000/predict';
 
-let stream, recorder, chunks = [], lipData = [], faceMesh, camera;
-let isRecording = false, isUploadMode = false, uploadedFile = null;
+let stream, recorder, chunks=[], lipData=[], faceMesh, camera;
+let isRecording=false, isUploadMode=false, uploadedFile=null, uploadedDuration='', previewUrl=null;
 
-const vid = document.getElementById('previewVideo');
-const img = document.getElementById('imgPreview');
-const out = document.getElementById('output');
-const overlay = document.getElementById('overlay');
-const ctx = overlay ? overlay.getContext('2d') : null;
+const vid=document.getElementById('previewVideo');
+const img=document.getElementById('imgPreview');
+const out=document.getElementById('output');
+const overlay=document.getElementById('overlay');
+const ctx=overlay.getContext('2d');
 
-setTimeout(() => {
-  const loading = document.getElementById('loading');
-  const landing = document.getElementById('landing');
-  if (loading) loading.style.display = 'none';
-  if (landing) landing.style.display = 'flex';
-}, 1000);
+setTimeout(()=>{
+  document.getElementById('loading').style.display='none';
+  document.getElementById('landing').style.display='flex';
+},1000);
 
-const uploadBtn = document.getElementById('uploadBtn');
-if (uploadBtn) uploadBtn.onclick = () => document.getElementById('fileInput').click();
-const backBtn = document.getElementById('backBtn');
-if (backBtn) backBtn.onclick = () => goHome();
-const fileInput = document.getElementById('fileInput');
-if (fileInput) fileInput.onchange = e => { if (e.target.files[0]) showFile(e.target.files[0]); };
-const dropZone = document.getElementById('dropZone');
-if (dropZone) dropZone.onclick = () => document.getElementById('fileInput').click();
+document.getElementById('uploadBtn').onclick=()=>document.getElementById('fileInput').click();
+document.getElementById('backBtn').onclick=()=>goHome();
+document.getElementById('fileInput').onchange=e=>{ if(e.target.files[0]) showFile(e.target.files[0]); };
+document.getElementById('dropZone').onclick=()=>document.getElementById('fileInput').click();
 
-function showFile(file) {
-  const landing = document.getElementById('landing');
-  const app = document.getElementById('app');
-  if (landing) landing.style.display = 'none';
-  if (app) app.style.display = 'flex';
-  uploadedFile = file;
-  isUploadMode = true;
-  lipData = [];
-  const url = URL.createObjectURL(file);
-  
-  if (!file.type.startsWith('video')) {
-    if (out) out.innerText = 'Please upload a valid video file (mp4, webm, avi or mov).';
-    const btn = document.getElementById('analyzeUploadBtn');
-    if (btn) btn.style.display = 'none';
-    uploadedFile = null; 
-    isUploadMode = false;
-    return;
+function showFile(file, label, duration){
+  document.getElementById('landing').style.display='none';
+  document.getElementById('app').style.display='flex';
+  uploadedFile=file;
+  isUploadMode=true;
+  lipData=[];
+  if(previewUrl) URL.revokeObjectURL(previewUrl);
+  const url=previewUrl=URL.createObjectURL(file);
+  uploadedDuration=duration||'';
+  if(!file.type.startsWith('video')){
+    out.innerText='Please upload a video file (mp4, webm, avi or mov).';
+    document.getElementById('analyzeUploadBtn').style.display='none';
+    uploadedFile=null; isUploadMode=false;
+  } else {
+    vid.srcObject=null;
+    vid.src=url; vid.style.display='block'; img.style.display='none';
+    vid.loop=false; vid.muted=true; vid.controls=true;   // play / pause / replay / seek
+    document.getElementById('recStart').style.display='none';
+    document.getElementById('recStop').style.display='none';
+    document.getElementById('analyzeUploadBtn').style.display='inline-block';
+    out.innerText=(label||'📁 Video loaded')+' - press ▶ to replay it, then press Analyze Clip';
+    vid.onerror=()=>{ out.innerText='⚠️ This browser cannot play this video format, but Analyze Clip still works.'; };
+    vid.onloadedmetadata=()=>{
+      overlay.width=vid.videoWidth; overlay.height=vid.videoHeight;
+      startLipTrackingForUpload();
+    };
   }
-  
-  // Fix black screen: clear old stream
-  if (vid.srcObject) {
-    try { vid.srcObject.getTracks().forEach(t => t.stop()); } catch(e) {}
-    vid.srcObject = null;
-  }
-  if (vid.src && vid.src.startsWith('blob:')) {
-    try { URL.revokeObjectURL(vid.src); } catch(e) {}
-  }
-  
-  vid.src = url; 
-  vid.style.display = 'block'; 
-  if (img) img.style.display = 'none';
-  vid.loop = false; 
-  vid.muted = true;
-  vid.controls = true;
-  vid.playsInline = true;
-  
-  const recStart = document.getElementById('recStart');
-  const recStop = document.getElementById('recStop');
-  const analyzeBtn = document.getElementById('analyzeUploadBtn');
-  if (recStart) recStart.style.display = 'none';
-  if (recStop) recStop.style.display = 'none';
-  if (analyzeBtn) analyzeBtn.style.display = 'inline-block';
-  if (out) out.innerText = 'Video uploaded successfully - Click Analyze to read lips';
-  
-  vid.onloadedmetadata = () => {
-    if (overlay) {
-      overlay.width = vid.videoWidth; 
-      overlay.height = vid.videoHeight;
-      overlay.style.width = '100%';
-      overlay.style.height = '100%';
-    }
-    startLipTrackingForUpload();
-  };
-  
-  vid.oncanplay = () => {
-    vid.play().catch(() => {});
-  };
 }
 
-async function startLive() {
-  const landing = document.getElementById('landing');
-  const app = document.getElementById('app');
-  if (landing) landing.style.display = 'none';
-  if (app) app.style.display = 'flex';
-  isUploadMode = false; lipData = [];
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-    vid.srcObject = stream; 
-    vid.style.display = 'block'; 
-    if (img) img.style.display = 'none';
-    vid.controls = false;
+async function startLive(){
+  document.getElementById('landing').style.display='none';
+  document.getElementById('app').style.display='flex';
+  isUploadMode=false; lipData=[];
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({video:true, audio:false});
+    vid.controls=false; vid.removeAttribute('src');
+    vid.srcObject=stream; vid.style.display='block'; img.style.display='none';
     await vid.play();
-    const recStart = document.getElementById('recStart');
-    const analyzeBtn = document.getElementById('analyzeUploadBtn');
-    if (recStart) recStart.style.display = 'inline-block';
-    if (analyzeBtn) analyzeBtn.style.display = 'none';
-    if (out) out.innerText = 'Lips are being detected - Please move your mouth';
+    document.getElementById('recStart').style.display='inline-block';
+    document.getElementById('analyzeUploadBtn').style.display='none';
+    out.innerText='👄 Lips Detect Ho Rahe Hain... Muh hilao';
     startLipTracking();
-  } catch (e) { 
-    if (out) out.innerText = 'Error: ' + e.message; 
-  }
+  }catch(e){ out.innerText='❌ '+e.message; }
 }
-const liveBtn = document.getElementById('liveBtn');
-if (liveBtn) liveBtn.onclick = startLive;
+document.getElementById('liveBtn').onclick=startLive;
 
-function startLipTracking() {
-  faceMesh = new FaceMesh({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/${file}` });
-  faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+function startLipTracking(){
+  faceMesh=new FaceMesh({locateFile:(file)=>`https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/${file}`});
+  faceMesh.setOptions({maxNumFaces:1, refineLandmarks:true, minDetectionConfidence:0.5, minTrackingConfidence:0.5});
   faceMesh.onResults(onFaceResults);
-  camera = new Camera(vid, {
-    onFrame: async () => { await faceMesh.send({ image: vid }); },
-    width: 640, height: 480
+  camera=new Camera(vid,{
+    onFrame:async()=>{ await faceMesh.send({image:vid}); },
+    width:640, height:480
   });
   camera.start();
 }
 
-function startLipTrackingForUpload() {
-  faceMesh = new FaceMesh({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/${file}` });
-  faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+function startLipTrackingForUpload(){
+  if(typeof FaceMesh==='undefined') return;   // tracking script not loaded (offline): the player still works
+  faceMesh=new FaceMesh({locateFile:(file)=>`https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/${file}`});
+  faceMesh.setOptions({maxNumFaces:1, refineLandmarks:true, minDetectionConfidence:0.5, minTrackingConfidence:0.5});
   faceMesh.onResults(onFaceResults);
-  
-  async function processFrame() {
-    if (vid.paused || vid.ended || !isUploadMode) return;
-    await faceMesh.send({ image: vid });
+  // uploaded video ke har frame ko process karo
+  async function processFrame(){
+    if(vid.paused || vid.ended || !isUploadMode) return;
+    await faceMesh.send({image:vid});
     requestAnimationFrame(processFrame);
   }
-  vid.onplay = () => { lipData = []; processFrame(); };
+  vid.onplay=()=>{ lipData=[]; processFrame(); };
 }
 
-function onFaceResults(results) {
-  if (!overlay) return;
-  if (!overlay.width) { overlay.width = vid.videoWidth; overlay.height = vid.videoHeight; }
-  if (!ctx) return;
-  ctx.clearRect(0, 0, overlay.width, overlay.height);
-  if (results.multiFaceLandmarks && results.multiFaceLandmarks[0]) {
-    const landmarks = results.multiFaceLandmarks[0];
-    const lipsIndices = [61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 13, 14];
-    ctx.fillStyle = '#2563eb';
-    lipsIndices.forEach(i => {
-      const p = landmarks[i];
+function onFaceResults(results){
+  if(!overlay.width) { overlay.width=vid.videoWidth; overlay.height=vid.videoHeight; }
+  ctx.clearRect(0,0,overlay.width,overlay.height);
+  if(results.multiFaceLandmarks && results.multiFaceLandmarks[0]){
+    const landmarks=results.multiFaceLandmarks[0];
+    const lipsIndices=[61,146,91,181,84,17,314,405,321,375,291,13,14];
+    ctx.fillStyle='#2563eb';
+    lipsIndices.forEach(i=>{
+      const p=landmarks[i];
       ctx.beginPath();
-      ctx.arc(p.x * overlay.width, p.y * overlay.height, 2.5, 0, 2 * Math.PI);
+      ctx.arc(p.x*overlay.width, p.y*overlay.height, 2.5, 0, 2*Math.PI);
       ctx.fill();
     });
-    const upper = landmarks[13], lower = landmarks[14];
-    const dist = Math.abs(upper.y - lower.y);
+    const upper=landmarks[13], lower=landmarks[14];
+    const dist=Math.abs(upper.y-lower.y);
     lipData.push(dist);
-    if (isUploadMode) {
-      if (out) out.innerText = `Tracking lip movements - Frames: ${lipData.length} | Mouth Open: ${dist.toFixed(4)}`;
-    } else if (!isRecording) {
-      if (out) {
-        out.style.color = '';
-        out.innerText = dist > 0.025 ? 'Mouth is open' : 'Face detected successfully';
-      }
+    if(isUploadMode){
+      out.innerText=`🔍 Upload Video Lips Tracking... Frames: ${lipData.length} | Open: ${dist.toFixed(4)}`;
+    } else if(!isRecording){
+      out.style.color='';
+      out.innerText=dist>0.025 ? '👄 Mouth open' : '👄 Face detected';
     }
   }
 }
 
-function startRec() {
-  if (!stream) { alert('Please turn on the live camera first.'); return; }
-  chunks = []; lipData = []; isRecording = true;
-  recorder = new MediaRecorder(stream);
-  recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
-  recorder.onstop = () => {
-    const blob = new Blob(chunks, { type: 'video/webm' });
-    const timer = document.getElementById('timer');
-    finishWithPrediction(blob, 'clip.webm', timer ? timer.innerText : '0 sec');
+function startRec(){
+  if(!stream){ alert('Turn on the live camera first.'); return; }
+  chunks=[]; lipData=[]; isRecording=true;
+  recorder=new MediaRecorder(stream);
+  recorder.ondataavailable=e=>{ if(e.data.size>0) chunks.push(e.data); };
+  recorder.onstop=()=>{
+    const blob=new Blob(chunks,{type:'video/webm'});
+    const dur=document.getElementById('timer').innerText;
+    // switch the camera off and open the recording in the player so it can be replayed first
+    if(camera){ camera.stop(); camera=null; }
+    if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; }
+    vid.srcObject=null;
+    showFile(new File([blob],'recorded-clip.webm',{type:'video/webm'}), '🎬 Recording ready', dur);
   };
   recorder.start();
-  const recStart = document.getElementById('recStart');
-  const recStop = document.getElementById('recStop');
-  if (recStart) recStart.style.display = 'none';
-  if (recStop) recStop.style.display = 'inline-block';
-  if (out) out.innerText = 'Recording lip movements - Audio is not required';
-  let s = 0; 
-  const timerEl = document.getElementById('timer');
-  window.t = setInterval(() => { s++; if (timerEl) timerEl.innerText = s + ' sec'; }, 1000);
+  document.getElementById('recStart').style.display='none';
+  document.getElementById('recStop').style.display='inline-block';
+  out.innerText='🔴 Lips Recording... bina awaz ke bhi chalega';
+  let s=0; window.t=setInterval(()=>{ s++; document.getElementById('timer').innerText=s+' sec'; },1000);
 }
 
-function stopRec() {
-  if (!isRecording) return;
-  isRecording = false;
-  try { recorder.stop(); } catch(e) {}
+function stopRec(){
+  if(!isRecording) return;
+  isRecording=false;
+  recorder.stop();
   clearInterval(window.t);
-  const recStop = document.getElementById('recStop');
-  if (recStop) recStop.style.display = 'none';
-  if (out) out.innerText = 'Processing video, please wait...';
+  document.getElementById('recStop').style.display='none';
+  out.innerText='Saving your recording...';
 }
 
-function analyzeUploadedVideo() {
-  if (!uploadedFile) { alert('Please upload a video first.'); return; }
-  finishWithPrediction(uploadedFile, uploadedFile.name, Math.floor(vid.duration || 0) + ' sec');
+function analyzeUploadedVideo(){
+  if(!uploadedFile){ alert('Please upload a video first.'); return; }
+  const d=isFinite(vid.duration)&&vid.duration>0 ? Math.floor(vid.duration)+' sec' : (uploadedDuration||'');
+  finishWithPrediction(uploadedFile, uploadedFile.name, d);
 }
 
-async function finishWithPrediction(blob, filename, duration) {
-  if (out) {
-    out.style.color = '';
-    out.innerText = 'Reading lip movements - This may take a few seconds';
-  }
-  const analyzeBtn = document.getElementById('analyzeUploadBtn');
-  if (analyzeBtn) analyzeBtn.disabled = true;
+// Sends the clip to the Flask backend, saves the real answer, then opens the result page.
+async function finishWithPrediction(blob, filename, duration){
+  out.style.color='';
+  out.innerText='⏳ Reading lips... this can take a few seconds';
+  document.getElementById('analyzeUploadBtn').disabled=true;
   let text;
-  try {
-    const form = new FormData();
+  try{
+    const form=new FormData();
     form.append('video', blob, filename);
-    const res = await fetch(API_URL, { method: 'POST', body: form });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || ('Server error ' + res.status));
-    text = (data.prediction || '').trim() || '(No words recognized)';
-  } catch (e) {
+    const res=await fetch(API_URL,{method:'POST',body:form});
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok) throw new Error(data.error || ('Server error '+res.status));
+    text=(data.prediction||'').trim() || '(no words recognised)';
+  }catch(e){
     const msg = (e instanceof TypeError)
-      ? 'Cannot reach the backend server. Please start it with "python app.py" in the backend folder.'
+      ? 'Cannot reach the backend. Start it with "python app.py" in the backend folder.'
       : e.message;
-    if (out) {
-      out.style.color = '#ef4444';
-      out.innerText = 'Error: ' + msg;
-    }
-    if (analyzeBtn) analyzeBtn.disabled = false;
-    const recStart = document.getElementById('recStart');
-    if (!isUploadMode && recStart) recStart.style.display = 'inline-block';
+    out.style.color='#ef4444';
+    out.innerText='❌ '+msg;
+    document.getElementById('analyzeUploadBtn').disabled=false;
+    if(!isUploadMode) document.getElementById('recStart').style.display='inline-block';
     return;
   }
-  try {
+  try{
     localStorage.setItem('liply_text', text);
     localStorage.setItem('liply_duration', duration);
-  } catch (e) {}
-  try { await saveVideo(blob); } catch (e) {}
-  window.location.href = 'result.html';
+  }catch(e){}
+  // The video goes into IndexedDB (room for large files); the result page works even if this fails.
+  try{ await saveVideo(blob); }catch(e){}
+  try{ await saveClip(blob, filename, text, duration); }catch(e){}
+  window.location.href='result.html';
 }
 
-function openVideoDB() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open('liply', 1);
-    req.onupgradeneeded = () => req.result.createObjectStore('videos');
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+// ---- tiny IndexedDB helper: keeps the last clip so result.html can replay it ----
+function openVideoDB(){
+  return new Promise((resolve,reject)=>{
+    const req=indexedDB.open('liply',2);
+    req.onupgradeneeded=()=>{
+      const db=req.result;
+      if(!db.objectStoreNames.contains('videos')) db.createObjectStore('videos');
+      if(!db.objectStoreNames.contains('clips')) db.createObjectStore('clips',{keyPath:'id',autoIncrement:true});
+    };
+    req.onsuccess=()=>resolve(req.result);
+    req.onerror=()=>reject(req.error);
   });
 }
-async function saveVideo(blob) {
-  const db = await openVideoDB();
-  await new Promise((resolve, reject) => {
-    const tx = db.transaction('videos', 'readwrite');
-    tx.objectStore('videos').put(blob, 'last');
-    tx.oncomplete = resolve; tx.onerror = () => reject(tx.error);
+async function saveVideo(blob){
+  const db=await openVideoDB();
+  await new Promise((resolve,reject)=>{
+    const tx=db.transaction('videos','readwrite');
+    tx.objectStore('videos').put(blob,'last');
+    tx.oncomplete=resolve; tx.onerror=()=>reject(tx.error);
   });
   db.close();
 }
 
-const recStartBtn = document.getElementById('recStart');
-if (recStartBtn) recStartBtn.onclick = startRec;
-const recStopBtn = document.getElementById('recStop');
-if (recStopBtn) recStopBtn.onclick = stopRec;
-const analyzeUploadBtn = document.getElementById('analyzeUploadBtn');
-if (analyzeUploadBtn) analyzeUploadBtn.onclick = analyzeUploadedVideo;
+document.getElementById('recStart').onclick=startRec;
+document.getElementById('recStop').onclick=stopRec;
+document.getElementById('analyzeUploadBtn').onclick=analyzeUploadedVideo;
 
-function goHome() {
-  if (stream) { try { stream.getTracks().forEach(t => t.stop()); } catch(e) {} }
-  if (camera) { try { camera.stop(); } catch(e) {} }
-  isUploadMode = false;
-  const landing = document.getElementById('landing');
-  const app = document.getElementById('app');
-  if (landing) landing.style.display = 'flex';
-  if (app) app.style.display = 'none';
-  try { vid.pause(); } catch(e) {}
-  vid.srcObject = null;
-  if (vid.src && vid.src.startsWith('blob:')) {
-    try { URL.revokeObjectURL(vid.src); } catch(e) {}
-  }
-  vid.src = '';
-  const analyzeBtn = document.getElementById('analyzeUploadBtn');
-  if (analyzeBtn) {
-    analyzeBtn.style.display = 'none';
-    analyzeBtn.disabled = false;
-  }
-  if (out) {
-    out.style.color = '';
-    out.innerText = '';
-  }
+function goHome(){
+  if(stream) stream.getTracks().forEach(t=>t.stop());
+  if(camera) camera.stop();
+  isUploadMode=false;
+  document.getElementById('landing').style.display='flex';
+  document.getElementById('app').style.display='none';
+  vid.pause(); vid.srcObject=null; vid.controls=false; vid.removeAttribute('src'); vid.load();
+  if(previewUrl){ URL.revokeObjectURL(previewUrl); previewUrl=null; }
+  uploadedFile=null;
+  document.getElementById('recStop').style.display='none';
+  document.getElementById('timer').innerText='0 sec';
+  document.getElementById('analyzeUploadBtn').style.display='none';
+  document.getElementById('analyzeUploadBtn').disabled=false;
+  out.style.color='';
 }
+
+// ================= My Clips library (landing page) =================
+const MAX_CLIPS=30;   // oldest clips are removed beyond this
+
+async function saveClip(blob, name, text, duration){
+  const db=await openVideoDB();
+  await new Promise((resolve,reject)=>{
+    const tx=db.transaction('clips','readwrite');
+    const store=tx.objectStore('clips');
+    store.add({blob, name, text, duration, date:Date.now()});
+    // keep only the newest MAX_CLIPS
+    store.getAllKeys().onsuccess=e=>{
+      const keys=e.target.result;
+      keys.slice(0, Math.max(0, keys.length-MAX_CLIPS)).forEach(k=>store.delete(k));
+    };
+    tx.oncomplete=resolve; tx.onerror=()=>reject(tx.error);
+  });
+  db.close();
+}
+
+async function loadClips(){
+  const db=await openVideoDB();
+  const clips=await new Promise((resolve,reject)=>{
+    const req=db.transaction('clips','readonly').objectStore('clips').getAll();
+    const keysReq=db.transaction('clips','readonly').objectStore('clips').getAllKeys();
+    req.onsuccess=()=>{
+      keysReq.onsuccess=()=>resolve(req.result.map((c,i)=>({...c,id:keysReq.result[i]})));
+    };
+    req.onerror=()=>reject(req.error);
+  });
+  db.close();
+  return clips.sort((a,b)=>b.date-a.date);
+}
+
+async function deleteClip(id){
+  const db=await openVideoDB();
+  await new Promise((resolve,reject)=>{
+    const tx=db.transaction('clips','readwrite');
+    tx.objectStore('clips').delete(id);
+    tx.oncomplete=resolve; tx.onerror=()=>reject(tx.error);
+  });
+  db.close();
+}
+
+let clipUrl=null;
+function playClip(c){
+  const player=document.getElementById('clipPlayer');
+  if(clipUrl) URL.revokeObjectURL(clipUrl);
+  clipUrl=URL.createObjectURL(c.blob);
+  player.src=clipUrl;
+  document.getElementById('clipModalText').innerText=c.text||'';
+  document.getElementById('clipModalName').innerText=c.name||'clip';
+  document.getElementById('clipModal').style.display='flex';
+  player.onerror=()=>{ document.getElementById('clipModalText').innerText='⚠️ This browser cannot play this video format.'; };
+  player.play().catch(()=>{});
+}
+function closeClip(){
+  const player=document.getElementById('clipPlayer');
+  player.pause(); player.removeAttribute('src'); player.load();
+  document.getElementById('clipModal').style.display='none';
+}
+document.getElementById('clipClose').onclick=closeClip;
+document.getElementById('clipModal').onclick=e=>{ if(e.target.id==='clipModal') closeClip(); };
+
+async function renderClips(){
+  const list=document.getElementById('clipList');
+  const empty=document.getElementById('noClips');
+  let clips=[];
+  try{ clips=await loadClips(); }catch(e){}
+  list.innerHTML='';
+  empty.style.display=clips.length?'none':'block';
+  clips.forEach(c=>{
+    const row=document.createElement('div');
+    row.className='clip-row';
+
+    const play=document.createElement('button');
+    play.className='clip-play'; play.innerText='▶'; play.title='Play this clip';
+    play.onclick=()=>playClip(c);
+
+    const info=document.createElement('div');
+    info.className='clip-info';
+    const title=document.createElement('b');
+    title.innerText=c.text||'(no words)';           // innerText: safe against HTML in names/text
+    const meta=document.createElement('span');
+    meta.innerText=`${c.name||'clip'} · ${c.duration||''} · ${new Date(c.date).toLocaleString()}`;
+    info.append(title, meta);
+
+    const del=document.createElement('button');
+    del.className='clip-del'; del.innerText='🗑'; del.title='Remove';
+    del.onclick=async()=>{ await deleteClip(c.id); renderClips(); };
+
+    row.append(play, info, del);
+    list.appendChild(row);
+  });
+}
+renderClips();
