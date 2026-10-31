@@ -1,146 +1,75 @@
-// result.js - Fixed version for LIP-READ
+let text='No data';
+try{ text=localStorage.getItem('liply_text')||'No data'; }catch(e){}
 
-const videoEl = document.getElementById('resultVideo');
-const predEl = document.getElementById('predictionText');
-const durEl = document.getElementById('durationText');
-const videoStatusEl = document.getElementById('videoStatus');
-const copyBtn = document.getElementById('copyBtn');
-const speakBtn = document.getElementById('speakBtn');
-const translateBtn = document.getElementById('translateBtn');
-const backHomeBtn = document.getElementById('backHomeBtn');
-const translatedEl = document.getElementById('translatedText');
+document.getElementById('textBox').innerText = text;
 
-// Load text from localStorage
-function loadResult() {
-  let text = '';
-  let duration = '';
-  try {
-    text = localStorage.getItem('liply_text') || '';
-    duration = localStorage.getItem('liply_duration') || '';
-  } catch(e) {}
+// load the analysed clip (saved by index.html in IndexedDB) so it can be replayed here
+(function loadVideo(){
+  const player=document.getElementById('resultVideo');
+  const note=document.getElementById('videoNote');
+  const replay=document.getElementById('replayBtn');
 
-  if (!text) {
-    predEl.textContent = 'No prediction found. Please upload a video again from the home page.';
-    predEl.style.color = '#ef4444';
-    if (durEl) durEl.textContent = 'Duration: -';
-    return;
+  function show(blob){
+    if(!blob){ note.innerText='No clip saved for replay.'; return; }
+    player.src=URL.createObjectURL(blob);
+    replay.style.display='inline-block';
+    player.onerror=()=>{ note.innerText='⚠️ This browser cannot play this video format.'; };
   }
+  replay.onclick=()=>{ player.currentTime=0; player.play().catch(()=>{}); };
 
-  predEl.textContent = text;
-  predEl.style.color = '#111';
-  if (durEl) durEl.textContent = duration ? `Duration: ${duration}` : 'Duration: -';
-}
-
-async function loadVideoFromDB() {
-  if (!videoEl) return;
-  try {
-    const req = indexedDB.open('liply', 1);
-    req.onsuccess = () => {
-      const db = req.result;
-      const tx = db.transaction('videos', 'readonly');
-      const store = tx.objectStore('videos');
-      const getReq = store.get('last');
-      getReq.onsuccess = () => {
-        const blob = getReq.result;
-        if (blob) {
-          const url = URL.createObjectURL(blob);
-          videoEl.src = url;
-          videoEl.onloadeddata = () => {
-            if (videoStatusEl) videoStatusEl.textContent = `Video loaded: ${blob.type || 'video'} | ${(blob.size/1024/1024).toFixed(2)} MB`;
-          };
-          videoEl.onerror = () => {
-            if (videoStatusEl) videoStatusEl.textContent = 'Video format not supported by browser for preview, but prediction is valid.';
-          };
-        } else {
-          if (videoStatusEl) videoStatusEl.textContent = 'No video found in storage. Prediction is still available.';
-        }
-        db.close();
-      };
-      getReq.onerror = () => {
-        if (videoStatusEl) videoStatusEl.textContent = 'Could not load video from storage.';
-        db.close();
+  try{
+    const req=indexedDB.open('liply',2);
+    req.onupgradeneeded=()=>{
+      const d=req.result;
+      if(!d.objectStoreNames.contains('videos')) d.createObjectStore('videos');
+      if(!d.objectStoreNames.contains('clips')) d.createObjectStore('clips',{keyPath:'id',autoIncrement:true});
+    };
+    req.onerror=()=>show(null);
+    req.onsuccess=()=>{
+      const db=req.result;
+      const get=db.transaction('videos','readonly').objectStore('videos').get('last');
+      get.onsuccess=()=>{
+        if(get.result){ show(get.result); db.close(); return; }
+        // fallback: newest clip in My Clips
+        const all=db.transaction('clips','readonly').objectStore('clips').getAll();
+        all.onsuccess=()=>{
+          const list=(all.result||[]).sort((x,y)=>y.date-x.date);
+          show(list.length ? list[0].blob : null);
+          db.close();
+        };
       };
     };
-    req.onerror = () => {
-      if (videoStatusEl) videoStatusEl.textContent = 'Could not open video storage.';
-    };
-  } catch(e) {
-    if (videoStatusEl) videoStatusEl.textContent = 'Video replay not available.';
+  }catch(e){ show(null); }
+})();
+
+document.getElementById('startTranslateBtn').onclick=async()=>{
+  const btn=document.getElementById('startTranslateBtn');
+  const to=document.getElementById('toLang').value;
+  const card=document.getElementById('transCard');
+  const box=document.getElementById('translatedBox');
+  
+  btn.innerText='⏳ Translating...';
+  card.style.display='block';
+  box.innerText='Translating...';
+  
+  if(to==='en'){ box.innerText=text; btn.innerText='✅ Translation Done'; return; }  // already English
+  try{
+    const res=await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|${to}`);
+    const data=await res.json();
+    box.innerText=data.responseData.translatedText;
+  }catch(e){
+    box.innerText='Translation is unavailable right now. Check your internet connection.';
   }
+  btn.innerText='✅ Translation Done';
+};
+
+function speakText(){
+  const t=document.getElementById('transCard').style.display==='block' ? document.getElementById('translatedBox').innerText : document.getElementById('textBox').innerText;
+  speechSynthesis.speak(new SpeechSynthesisUtterance(t));
 }
 
-if (copyBtn) {
-  copyBtn.onclick = async () => {
-    const txt = predEl.textContent || '';
-    try {
-      await navigator.clipboard.writeText(txt);
-      const old = copyBtn.textContent;
-      copyBtn.textContent = 'Copied!';
-      setTimeout(()=> copyBtn.textContent = old, 1500);
-    } catch(e) {
-      alert('Copy failed: ' + txt);
-    }
-  };
+function copyText(){
+  const t=document.getElementById('transCard').style.display==='block' ? document.getElementById('translatedBox').innerText : document.getElementById('textBox').innerText;
+  navigator.clipboard.writeText(t);
+  alert('Copied!');
 }
-
-if (speakBtn) {
-  speakBtn.onclick = () => {
-    const txt = predEl.textContent || '';
-    if (!txt) return;
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      const utter = new SpeechSynthesisUtterance(txt);
-      utter.lang = 'en-US';
-      window.speechSynthesis.speak(utter);
-    } else {
-      alert('Speech synthesis not supported in this browser.');
-    }
-  };
-}
-
-if (translateBtn) {
-  translateBtn.onclick = async () => {
-    const txt = predEl.textContent || '';
-    if (!txt) return;
-    const original = translateBtn.textContent;
-    translateBtn.textContent = 'Translating...';
-    translateBtn.disabled = true;
-    try {
-      // Using MyMemory free API (no key needed)
-      const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(txt)}&langpair=en|hi`);
-      const data = await res.json();
-      let translated = data?.responseData?.translatedText || '';
-      if (!translated || translated.toLowerCase().includes('mymemory')) {
-        throw new Error('Translation failed');
-      }
-      if (translatedEl) {
-        translatedEl.textContent = 'Hindi: ' + translated;
-        translatedEl.style.display = 'block';
-      }
-      // Speak Hindi if possible
-      if ('speechSynthesis' in window) {
-        const utter = new SpeechSynthesisUtterance(translated);
-        utter.lang = 'hi-IN';
-        window.speechSynthesis.speak(utter);
-      }
-    } catch(e) {
-      if (translatedEl) {
-        translatedEl.textContent = 'Translation failed. Please check internet connection.';
-        translatedEl.style.display = 'block';
-      }
-    } finally {
-      translateBtn.textContent = original;
-      translateBtn.disabled = false;
-    }
-  };
-}
-
-if (backHomeBtn) {
-  backHomeBtn.onclick = () => {
-    window.location.href = 'index.html';
-  };
-}
-
-// Init
-loadResult();
-loadVideoFromDB();

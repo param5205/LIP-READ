@@ -3,42 +3,51 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LIPLY - Result</title>
+<title>LIPLY - Result & Translation</title>
 <link rel="stylesheet" href="result.css">
-<style>
-body{font-family:Inter,system-ui,sans-serif;background:#f8fafc;margin:0;padding:20px;display:flex;flex-direction:column;align-items:center;gap:20px}
-.card{background:#fff;border-radius:16px;padding:20px;box-shadow:0 4px 20px rgba(0,0,0,0.08);width:100%;max-width:720px}
-.video-wrapper{position:relative;width:100%;max-width:640px;aspect-ratio:4/3;background:#111;border-radius:12px;overflow:hidden;display:flex;align-items:center;justify-content:center}
-#resultVideo{width:100%;height:100%;object-fit:contain;background:#111;border-radius:12px}
-.btn{padding:10px 18px;border-radius:8px;border:none;background:#2563eb;color:#fff;cursor:pointer;font-weight:600;margin:4px}
-.btn.secondary{background:#e5e7eb;color:#111}
-#predictionText{font-size:20px;font-weight:700;min-height:32px;word-break:break-word}
-</style>
 </head>
 <body>
 
-<div class="card" style="text-align:center;">
-  <h2 style="margin:0 0 8px;">Prediction Result</h2>
-  <p id="durationText" style="color:#6b7280;margin:0;">Duration: -</p>
+<div class="topbar">
+<button onclick="location.href='index.html'">← Back to LIPLY</button>
+<div class="logo-chip">✨ LIPLY AI</div>
 </div>
 
 <div class="card">
-  <div class="video-wrapper">
-    <video id="resultVideo" controls autoplay muted playsinline></video>
-  </div>
-  <p id="videoStatus" style="color:#6b7280;font-size:13px;text-align:center;margin-top:8px;"></p>
+<div class="videoBox">
+<span class="badge">🔴 LIPS ONLY • NO VOICE</span>
+<video id="resultVideo" controls playsinline></video>
+<div id="videoNote"></div>
+<button id="replayBtn" style="display:none">🔁 Replay clip</button>
 </div>
 
-<div class="card">
-  <h3 style="margin-top:0;">Recognized Text</h3>
-  <div id="predictionText">Loading result...</div>
-  <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;">
-    <button class="btn" id="copyBtn">Copy Text</button>
-    <button class="btn" id="speakBtn">Speak</button>
-    <button class="btn secondary" id="translateBtn">Translate to Hindi</button>
-    <button class="btn secondary" id="backHomeBtn">Back to Home</button>
-  </div>
-  <div id="translatedText" style="margin-top:12px;font-weight:600;color:#0f172a;display:none;"></div>
+<div class="resultBox">
+<h2>Ye Aapne Bola Tha</h2>
+<p class="sub">Sirf hontho ki movement se detect kiya gaya</p>
+
+<div class="textCard">
+<div id="textBox">Loading...</div>
+</div>
+
+<div class="langRow">
+<select id="toLang">
+<option value="hi">हिंदी में अनुवाद</option>
+<option value="en">English</option>
+<option value="es">Spanish</option>
+</select>
+</div>
+
+<button id="startTranslateBtn">🌐 Start Translation</button>
+
+<div class="transCard" id="transCard">
+<div id="translatedBox"></div>
+</div>
+
+<div class="smallBtns">
+<button onclick="speakText()">🔊 Speak</button>
+<button onclick="copyText()">📋 Copy</button>
+</div>
+</div>
 </div>
 
 <script src="result.js"></script>
