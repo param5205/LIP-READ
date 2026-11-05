@@ -45,6 +45,16 @@ def load_sentences(path):
     return out
 
 
+def open_camera(index):
+    """Open the webcam. On Windows the DirectShow backend is more stable than the default (MSMF)."""
+    if os.name == "nt":
+        cap = cv2.VideoCapture(index, cv2.CAP_DSHOW)
+        if cap.isOpened():
+            return cap
+        cap.release()
+    return cv2.VideoCapture(index)
+
+
 def put_text(img, text, org, scale=0.8, color=(255, 255, 255)):
     cv2.putText(img, text, org, cv2.FONT_HERSHEY_SIMPLEX, scale, (0, 0, 0), 4, cv2.LINE_AA)
     cv2.putText(img, text, org, cv2.FONT_HERSHEY_SIMPLEX, scale, color, 2, cv2.LINE_AA)
@@ -70,7 +80,7 @@ def main():
     os.makedirs(vdir, exist_ok=True)
     os.makedirs(ldir, exist_ok=True)
 
-    cap = cv2.VideoCapture(args.cam)
+    cap = open_camera(args.cam)
     if not cap.isOpened():
         raise SystemExit(f"Could not open camera {args.cam}")
 
@@ -92,11 +102,22 @@ def main():
     state, t0 = "idle", 0.0
     frames, last_add = [], 0.0
     msg = ""
+    fails = 0
 
     while saved < args.count:
         ok, frame = cap.read()
         if not ok:
-            break
+            # the camera hiccuped: wait a moment, retry, and reopen it if it stays dead
+            fails += 1
+            time.sleep(0.05)
+            if fails == 40:
+                cap.release()
+                cap = open_camera(args.cam)
+            if fails > 120:
+                print("Camera stopped giving frames. Close other apps that use the camera and run again.")
+                break
+            continue
+        fails = 0
         now = time.time()
         h, w = frame.shape[:2]
         shown = frame.copy()

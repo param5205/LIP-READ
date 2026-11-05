@@ -16,6 +16,7 @@ Keys:  SPACE = record a sentence, c = clear text, q = quit
 Run this on the computer that has the webcam (not on a remote server).
 """
 import argparse
+import os
 import threading
 import time
 from collections import deque
@@ -72,6 +73,16 @@ class InferenceWorker(threading.Thread):
             self.version += 1
 
 
+def open_camera(index):
+    """Open the webcam. On Windows the DirectShow backend is more stable than the default (MSMF)."""
+    if os.name == "nt":
+        cap = cv2.VideoCapture(index, cv2.CAP_DSHOW)
+        if cap.isOpened():
+            return cap
+        cap.release()
+    return cv2.VideoCapture(index)
+
+
 def put_text(img, text, org, scale=0.7, color=(255, 255, 255)):
     """Text with a dark outline so it is readable on any background."""
     cv2.putText(img, text, org, cv2.FONT_HERSHEY_SIMPLEX, scale, (0, 0, 0), 4, cv2.LINE_AA)
@@ -88,7 +99,7 @@ def main():
                     help="continuous mode: min mouth movement to count as speaking")
     args = ap.parse_args()
 
-    cap = cv2.VideoCapture(args.cam)
+    cap = open_camera(args.cam)
     if not cap.isOpened():
         raise SystemExit(f"Could not open camera {args.cam}")
 
