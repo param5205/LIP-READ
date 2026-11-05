@@ -12,6 +12,7 @@ Re-running continues numbering (existing me_*.mp4 files are kept).
 import argparse
 import os
 import random
+import re
 import time
 
 import cv2
@@ -33,6 +34,17 @@ def new_sentence():
                      random.choice(LETTERS), random.choice(DIGITS), random.choice(ADVERBS)])
 
 
+def load_sentences(path):
+    """Read lines like '12. lay red at c four now' (ignores everything else)."""
+    out = []
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            m = re.match(r"^\s*\d+\.\s+([a-z ]+?)\s*$", line)
+            if m:
+                out.append(m.group(1))
+    return out
+
+
 def put_text(img, text, org, scale=0.8, color=(255, 255, 255)):
     cv2.putText(img, text, org, cv2.FONT_HERSHEY_SIMPLEX, scale, (0, 0, 0), 4, cv2.LINE_AA)
     cv2.putText(img, text, org, cv2.FONT_HERSHEY_SIMPLEX, scale, color, 2, cv2.LINE_AA)
@@ -49,6 +61,9 @@ def main():
     ap.add_argument("--cam", type=int, default=0)
     ap.add_argument("--count", type=int, default=150, help="how many clips to record this session")
     ap.add_argument("--out", default="data")
+    ap.add_argument("--sentences", help="file with a numbered sentence list (practice_sentences.txt); "
+                                        "default = random sentences")
+    ap.add_argument("--start", type=int, default=1, help="with --sentences: first sentence number to read")
     args = ap.parse_args()
 
     vdir, ldir = os.path.join(args.out, "videos"), os.path.join(args.out, "labels")
@@ -61,7 +76,19 @@ def main():
 
     idx = next_index(vdir)
     saved, last_name = 0, None
-    sentence = new_sentence()
+    plan = load_sentences(args.sentences) if args.sentences else None
+    pos = max(args.start - 1, 0)
+
+    def next_sentence():
+        nonlocal pos
+        if plan is None:
+            return new_sentence()
+        if pos >= len(plan):
+            raise SystemExit("Finished the sentence list.")
+        pos += 1
+        return plan[pos - 1]
+
+    sentence = next_sentence()
     state, t0 = "idle", 0.0
     frames, last_add = [], 0.0
     msg = ""
@@ -79,7 +106,7 @@ def main():
             if key == ord(" "):
                 state, t0, msg = "countdown", now, ""
             elif key == ord("s"):
-                sentence = new_sentence()
+                sentence = next_sentence()
             elif key == ord("d") and last_name:
                 for p in (os.path.join(vdir, last_name + ".mp4"), os.path.join(ldir, last_name + ".txt")):
                     if os.path.exists(p):
@@ -108,9 +135,15 @@ def main():
                     fh.write(sentence + "\n")
                 idx, saved, last_name = idx + 1, saved + 1, name
                 msg = f"Saved {name}"
-                sentence, state = new_sentence(), "idle"
+                state = "idle"
+                if plan is not None and pos >= len(plan):
+                    print("Finished the sentence list.")
+                    break
+                sentence = next_sentence()
 
         put_text(shown, f"Say: {sentence}", (10, 30), 0.9, (0, 255, 0))
+        if plan is not None:
+            put_text(shown, f"sentence {pos}/{len(plan)}", (w - 220, 30), 0.6, (255, 255, 0))
         put_text(shown, f"saved {saved}/{args.count}  {msg}", (10, h - 15), 0.6, (0, 255, 255))
         if state == "idle":
             put_text(shown, "SPACE=record  s=skip  d=delete last  q=quit", (10, h - 45), 0.5)
