@@ -55,6 +55,24 @@ def snap_to_grid(text):
     return " ".join(out), True
 
 
+def load_phrases(path):
+    """One phrase per line; blank lines and lines starting with # are ignored."""
+    with open(path, encoding="utf-8") as f:
+        return [ln.strip().lower() for ln in f if ln.strip() and not ln.startswith("#")]
+
+
+def snap_to_phrases(text, phrases, max_ratio=0.6):
+    """Closed-set matching: return (closest phrase, True) if the prediction is close enough
+    to one of the known phrases (edit distance / longer length <= max_ratio), else (text, False).
+    Use only when the model was trained on exactly these phrases."""
+    text = text.strip()
+    if not text or not phrases:
+        return text, False
+    best = min(phrases, key=lambda p: edit_distance(text, p) / max(len(text), len(p)))
+    ratio = edit_distance(text, best) / max(len(text), len(best))
+    return (best, True) if ratio <= max_ratio else (text, False)
+
+
 if __name__ == "__main__":
     tests = {
         "lay greed with t two soon": "lay green with t two soon",
@@ -64,4 +82,12 @@ if __name__ == "__main__":
     }
     for src, want in tests.items():
         got, _ = snap_to_grid(src)
+        print("OK  " if got == want else "FAIL", src, "->", got)
+    intro = ["this is param pratap bhardwaj", "studying in m i t meerut",
+             "computer science and engineering", "lives in ghaziabad"]
+    ptests = {"thips prtp patch ed erdwaj": intro[0], "studying in m t nerut": intro[1],
+              "compter rience and inering": intro[2], "livs inh ghziabad": intro[3],
+              "xqzv": "xqzv"}
+    for src, want in ptests.items():
+        got, _ = snap_to_phrases(src, intro)
         print("OK  " if got == want else "FAIL", src, "->", got)

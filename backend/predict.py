@@ -2,8 +2,14 @@
 predict.py - run the trained model on a video.
 
 CLI:  python predict.py path/to/video.mp4
+      python predict.py path/to/video.mp4 --snap                         (GRID 6-word clean-up)
+      python predict.py path/to/video.mp4 --phrases intro_phrases.txt    (match to your own lines)
 API:  from predict import predict_video
+
+Web page / app.py: to match results to your intro lines, set this before starting the app
+(PowerShell):  $env:LIPREAD_PHRASES="intro_phrases.txt"; python app.py
 """
+import os
 import sys
 import threading
 
@@ -35,13 +41,26 @@ def get_model():
 def predict_video(video_path):
     frames = preprocess_video(video_path).to(DEVICE)
     logits = get_model()(frames)
-    return decode(logits)
+    text = decode(logits)
+    phrases_file = os.environ.get("LIPREAD_PHRASES")   # optional closed-set matching
+    if phrases_file:
+        from grid_grammar import load_phrases, snap_to_phrases
+        text = snap_to_phrases(text, load_phrases(phrases_file))[0]
+    return text
 
 
 if __name__ == "__main__":
-    args = [a for a in sys.argv[1:] if a != "--snap"]
+    argv = sys.argv[1:]
+    if "--phrases" in argv:                              # --phrases <file>
+        i = argv.index("--phrases")
+        if i + 1 >= len(argv):
+            print("Usage: python predict.py <video_path> [--snap] [--phrases <file>]")
+            sys.exit(1)
+        os.environ["LIPREAD_PHRASES"] = argv[i + 1]
+        del argv[i:i + 2]
+    args = [a for a in argv if a != "--snap"]
     if len(args) != 1:
-        print("Usage: python predict.py <video_path> [--snap]")
+        print("Usage: python predict.py <video_path> [--snap] [--phrases <file>]")
         sys.exit(1)
     text = predict_video(args[0])
     if "--snap" in sys.argv:   # force GRID 6-word grammar (GRID-style speech only)

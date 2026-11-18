@@ -8,7 +8,7 @@ import argparse
 
 import torch
 
-from grid_grammar import snap_to_grid
+from grid_grammar import load_phrases, snap_to_grid, snap_to_phrases
 from model import LipReader
 from preprocess import DEVICE, IN_CHANNELS, VOCAB, decode
 from train import MODEL_PATH, get_splits
@@ -34,7 +34,12 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--own-holdout", type=float, default=0.0,
                     help="test only on the held-out part of your me_* clips (same value as in train.py)")
-    _, _, test_ds = get_splits(ap.parse_args().own_holdout)
+    ap.add_argument("--phrases", help="phrases file (e.g. intro_phrases.txt): also report exact-match "
+                                      "accuracy after matching each prediction to the closest phrase")
+    args = ap.parse_args()
+    phrases = load_phrases(args.phrases) if args.phrases else None
+    phrase_hits = 0
+    _, _, test_ds = get_splits(args.own_holdout)
 
     model = LipReader(len(VOCAB) + 1, IN_CHANNELS).to(DEVICE)
     model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE))
@@ -53,6 +58,8 @@ def main():
         word_total += len(truth.split())
 
         snapped = snap_to_grid(pred)[0]
+        if phrases:
+            phrase_hits += snap_to_phrases(pred, phrases)[0] == truth
         s_char_err += edit_distance(snapped, truth)
         s_word_err += edit_distance(snapped.split(), truth.split())
 
@@ -64,6 +71,9 @@ def main():
     print(f"WER: {word_err / max(word_total, 1):.2%}")
     print(f"With GRID grammar clean-up -> CER: {s_char_err / max(char_total, 1):.2%}  "
           f"WER: {s_word_err / max(word_total, 1):.2%}")
+    if phrases:
+        print(f"Phrase matching: {phrase_hits}/{len(test_ds)} exact "
+              f"({phrase_hits / max(len(test_ds), 1):.1%})")
 
 
 if __name__ == "__main__":
