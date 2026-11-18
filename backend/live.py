@@ -25,7 +25,7 @@ import cv2
 import numpy as np
 import torch
 
-from grid_grammar import snap_to_grid
+from grid_grammar import load_phrases, snap_to_grid, snap_to_phrases
 from predict import get_model
 from preprocess import (DEVICE, NUM_FRAMES, _crop_mouth, create_face_detector, decode,
                         frames_to_tensor, prepare_mouth)
@@ -41,10 +41,11 @@ class InferenceWorker(threading.Thread):
     """Runs the model in the background so the video never freezes.
     Only the newest window is kept; older ones are skipped if the model is slow."""
 
-    def __init__(self, snap):
+    def __init__(self, snap, phrases=None):
         super().__init__(daemon=True)
         self.model = get_model()
         self.snap = snap
+        self.phrases = phrases
         self.lock = threading.Lock()
         self.event = threading.Event()
         self.pending = None
@@ -69,7 +70,10 @@ class InferenceWorker(threading.Thread):
             x = frames_to_tensor(frames).to(DEVICE)
             raw = decode(self.model(x))
             self.raw = raw
-            self.text = snap_to_grid(raw)[0] if self.snap else raw
+            if self.phrases:                      # closed-set demo mode (your own intro lines)
+                self.text = snap_to_phrases(raw, self.phrases)[0]
+            else:
+                self.text = snap_to_grid(raw)[0] if self.snap else raw
             self.version += 1
 
 
@@ -95,6 +99,8 @@ def main():
     ap.add_argument("--mode", choices=["sentence", "continuous"], default="sentence")
     ap.add_argument("--no-snap", action="store_true",
                     help="do not force the GRID 6-word grammar on the output")
+    ap.add_argument("--phrases", help="text file with the exact phrases the model was trained on "
+                                      "(e.g. intro_phrases.txt): the output is matched to the closest one")
     ap.add_argument("--motion", type=float, default=2.0,
                     help="continuous mode: min mouth movement to count as speaking")
     args = ap.parse_args()
@@ -103,7 +109,8 @@ def main():
     if not cap.isOpened():
         raise SystemExit(f"Could not open camera {args.cam}")
 
-    worker = InferenceWorker(snap=not args.no_snap)
+    phrases = load_phrases(args.phrases) if args.phrases else None
+    worker = InferenceWorker(snap=not args.no_snap, phrases=phrases)
     worker.start()
 
     buf = deque(maxlen=NUM_FRAMES)
@@ -173,7 +180,7 @@ def main():
                     put_text(frame, message, (10, h - 20), 0.8, (0, 0, 255))
                 elif worker.text:
                     put_text(frame, worker.text, (10, h - 20), 0.9)
-                    if args.no_snap is False and worker.raw != worker.text:
+                    if (phrases or args.no_snap is False) and worker.raw != worker.text:
                         put_text(frame, "raw: " + worker.raw, (10, h - 55), 0.5, (200, 200, 200))
             else:
                 # ---------------- continuous mode ----------------

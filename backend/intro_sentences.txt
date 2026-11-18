@@ -1,0 +1,210 @@
+Intro sentences - say each line aloud (200 lines, sets of 50)
+
+
+=== Set 1 ===
+  1. this is param pratap bhardwaj
+  2. studying in m i t meerut
+  3. computer science and engineering
+  4. lives in ghaziabad
+  5. studying in m i t meerut
+  6. this is param pratap bhardwaj
+  7. computer science and engineering
+  8. lives in ghaziabad
+  9. this is param pratap bhardwaj
+ 10. lives in ghaziabad
+ 11. computer science and engineering
+ 12. studying in m i t meerut
+ 13. computer science and engineering
+ 14. lives in ghaziabad
+ 15. this is param pratap bhardwaj
+ 16. studying in m i t meerut
+ 17. studying in m i t meerut
+ 18. lives in ghaziabad
+ 19. this is param pratap bhardwaj
+ 20. computer science and engineering
+ 21. lives in ghaziabad
+ 22. studying in m i t meerut
+ 23. computer science and engineering
+ 24. this is param pratap bhardwaj
+ 25. studying in m i t meerut
+ 26. this is param pratap bhardwaj
+ 27. computer science and engineering
+ 28. lives in ghaziabad
+ 29. studying in m i t meerut
+ 30. lives in ghaziabad
+ 31. computer science and engineering
+ 32. this is param pratap bhardwaj
+ 33. studying in m i t meerut
+ 34. computer science and engineering
+ 35. lives in ghaziabad
+ 36. this is param pratap bhardwaj
+ 37. lives in ghaziabad
+ 38. this is param pratap bhardwaj
+ 39. computer science and engineering
+ 40. studying in m i t meerut
+ 41. this is param pratap bhardwaj
+ 42. computer science and engineering
+ 43. studying in m i t meerut
+ 44. lives in ghaziabad
+ 45. lives in ghaziabad
+ 46. this is param pratap bhardwaj
+ 47. computer science and engineering
+ 48. studying in m i t meerut
+ 49. lives in ghaziabad
+ 50. this is param pratap bhardwaj
+
+=== Set 2 ===
+ 51. studying in m i t meerut
+ 52. computer science and engineering
+ 53. lives in ghaziabad
+ 54. computer science and engineering
+ 55. studying in m i t meerut
+ 56. this is param pratap bhardwaj
+ 57. studying in m i t meerut
+ 58. this is param pratap bhardwaj
+ 59. computer science and engineering
+ 60. lives in ghaziabad
+ 61. lives in ghaziabad
+ 62. this is param pratap bhardwaj
+ 63. studying in m i t meerut
+ 64. computer science and engineering
+ 65. studying in m i t meerut
+ 66. lives in ghaziabad
+ 67. this is param pratap bhardwaj
+ 68. computer science and engineering
+ 69. computer science and engineering
+ 70. lives in ghaziabad
+ 71. studying in m i t meerut
+ 72. this is param pratap bhardwaj
+ 73. lives in ghaziabad
+ 74. this is param pratap bhardwaj
+ 75. studying in m i t meerut
+ 76. computer science and engineering
+ 77. studying in m i t meerut
+ 78. lives in ghaziabad
+ 79. computer science and engineering
+ 80. this is param pratap bhardwaj
+ 81. lives in ghaziabad
+ 82. computer science and engineering
+ 83. this is param pratap bhardwaj
+ 84. studying in m i t meerut
+ 85. this is param pratap bhardwaj
+ 86. computer science and engineering
+ 87. studying in m i t meerut
+ 88. lives in ghaziabad
+ 89. studying in m i t meerut
+ 90. computer science and engineering
+ 91. this is param pratap bhardwaj
+ 92. lives in ghaziabad
+ 93. lives in ghaziabad
+ 94. this is param pratap bhardwaj
+ 95. studying in m i t meerut
+ 96. computer science and engineering
+ 97. lives in ghaziabad
+ 98. this is param pratap bhardwaj
+ 99. studying in m i t meerut
+100. computer science and engineering
+
+=== Set 3 ===
+101. studying in m i t meerut
+102. computer science and engineering
+103. this is param pratap bhardwaj
+104. lives in ghaziabad
+105. lives in ghaziabad
+106. this is param pratap bhardwaj
+107. computer science and engineering
+108. studying in m i t meerut
+109. computer science and engineering
+110. studying in m i t meerut
+111. lives in ghaziabad
+112. this is param pratap bhardwaj
+113. studying in m i t meerut
+114. computer science and engineering
+115. this is param pratap bhardwaj
+116. lives in ghaziabad
+117. studying in m i t meerut
+118. this is param pratap bhardwaj
+119. computer science and engineering
+120. lives in ghaziabad
+121. this is param pratap bhardwaj
+122. computer science and engineering
+123. lives in ghaziabad
+124. studying in m i t meerut
+125. lives in ghaziabad
+126. computer science and engineering
+127. studying in m i t meerut
+128. this is param pratap bhardwaj
+129. computer science and engineering
+130. lives in ghaziabad
+131. this is param pratap bhardwaj
+132. studying in m i t meerut
+133. studying in m i t meerut
+134. lives in ghaziabad
+135. this is param pratap bhardwaj
+136. computer science and engineering
+137. computer science and engineering
+138. this is param pratap bhardwaj
+139. lives in ghaziabad
+140. studying in m i t meerut
+141. studying in m i t meerut
+142. computer science and engineering
+143. lives in ghaziabad
+144. this is param pratap bhardwaj
+145. computer science and engineering
+146. this is param pratap bhardwaj
+147. studying in m i t meerut
+148. lives in ghaziabad
+149. this is param pratap bhardwaj
+150. lives in ghaziabad
+
+=== Set 4 ===
+151. studying in m i t meerut
+152. computer science and engineering
+153. studying in m i t meerut
+154. computer science and engineering
+155. lives in ghaziabad
+156. this is param pratap bhardwaj
+157. lives in ghaziabad
+158. this is param pratap bhardwaj
+159. computer science and engineering
+160. studying in m i t meerut
+161. lives in ghaziabad
+162. studying in m i t meerut
+163. computer science and engineering
+164. this is param pratap bhardwaj
+165. this is param pratap bhardwaj
+166. studying in m i t meerut
+167. lives in ghaziabad
+168. computer science and engineering
+169. this is param pratap bhardwaj
+170. lives in ghaziabad
+171. computer science and engineering
+172. studying in m i t meerut
+173. computer science and engineering
+174. this is param pratap bhardwaj
+175. lives in ghaziabad
+176. studying in m i t meerut
+177. computer science and engineering
+178. this is param pratap bhardwaj
+179. lives in ghaziabad
+180. studying in m i t meerut
+181. lives in ghaziabad
+182. this is param pratap bhardwaj
+183. computer science and engineering
+184. studying in m i t meerut
+185. lives in ghaziabad
+186. this is param pratap bhardwaj
+187. computer science and engineering
+188. studying in m i t meerut
+189. computer science and engineering
+190. this is param pratap bhardwaj
+191. studying in m i t meerut
+192. lives in ghaziabad
+193. studying in m i t meerut
+194. computer science and engineering
+195. this is param pratap bhardwaj
+196. lives in ghaziabad
+197. computer science and engineering
+198. studying in m i t meerut
+199. lives in ghaziabad
+200. this is param pratap bhardwaj
