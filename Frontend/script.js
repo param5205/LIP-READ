@@ -60,7 +60,7 @@ async function startLive(){
     await vid.play();
     document.getElementById('recStart').style.display='inline-block';
     document.getElementById('analyzeUploadBtn').style.display='none';
-    out.innerText='👄 Lips Detect Ho Rahe Hain... Muh hilao';
+    out.innerText='👄 Lips detected... move your mouth';
     startLipTracking();
   }catch(e){ out.innerText='❌ '+e.message; }
 }
@@ -82,7 +82,7 @@ function startLipTrackingForUpload(){
   faceMesh=new FaceMesh({locateFile:(file)=>`https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/${file}`});
   faceMesh.setOptions({maxNumFaces:1, refineLandmarks:true, minDetectionConfidence:0.5, minTrackingConfidence:0.5});
   faceMesh.onResults(onFaceResults);
-  // uploaded video ke har frame ko process karo
+  // process every frame of the uploaded video
   async function processFrame(){
     if(vid.paused || vid.ended || !isUploadMode) return;
     await faceMesh.send({image:vid});
@@ -133,7 +133,7 @@ function startRec(){
   recorder.start();
   document.getElementById('recStart').style.display='none';
   document.getElementById('recStop').style.display='inline-block';
-  out.innerText='🔴 Lips Recording... bina awaz ke bhi chalega';
+  out.innerText='🔴 Recording lips... works silently too';
   let s=0; window.t=setInterval(()=>{ s++; document.getElementById('timer').innerText=s+' sec'; },1000);
 }
 
